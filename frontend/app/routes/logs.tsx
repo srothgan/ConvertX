@@ -9,7 +9,6 @@ import { useMemo, useState } from "react";
 import { ApiErrorNotice } from "~/components/api-error-notice";
 import { AuthRequiredState } from "~/components/auth-required-state";
 import { PageHeader } from "~/components/page-header";
-import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -17,22 +16,57 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { ApiError, AuthRequiredError } from "~/lib/api/client";
 import { useLogsQuery } from "~/lib/api/queries";
 import type { LogEntry } from "~/lib/api/schemas";
+import { cn } from "~/lib/utils";
 
 type LogLevelFilter = "all" | LogEntry["level"];
 
 const levels = ["all", "error", "warn", "info", "log"] satisfies LogLevelFilter[];
 
-function levelBadgeVariant(level: LogEntry["level"]) {
-  if (level === "error") {
-    return "destructive" as const;
-  }
+const levelStyles = {
+  error: {
+    badge: "bg-red-800 text-white ring-red-950/25",
+    marker: "border-l-red-600",
+    row: "bg-red-50/45 hover:bg-red-50/80",
+  },
+  warn: {
+    badge: "bg-amber-300 text-stone-950 ring-amber-700/35",
+    marker: "border-l-amber-500",
+    row: "bg-amber-50/50 hover:bg-amber-50/85",
+  },
+  info: {
+    badge: "bg-sky-800 text-white ring-sky-950/25",
+    marker: "border-l-sky-600",
+    row: "bg-sky-50/45 hover:bg-sky-50/80",
+  },
+  log: {
+    badge: "bg-stone-700 text-white ring-stone-950/25",
+    marker: "border-l-stone-400",
+    row: "bg-white hover:bg-stone-50/90",
+  },
+} satisfies Record<LogEntry["level"], { badge: string; marker: string; row: string }>;
 
-  if (level === "warn") {
-    return "secondary" as const;
-  }
-
-  return "outline" as const;
-}
+const filterStyles = {
+  all: {
+    active: "border-stone-950 bg-stone-950 text-white hover:bg-stone-900",
+    inactive: "border-stone-300 bg-white text-stone-900 hover:bg-stone-100",
+  },
+  error: {
+    active: "border-red-800 bg-red-800 text-white hover:bg-red-700",
+    inactive: "border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
+  },
+  warn: {
+    active: "border-amber-400 bg-amber-300 text-stone-950 hover:bg-amber-400",
+    inactive: "border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100",
+  },
+  info: {
+    active: "border-sky-800 bg-sky-800 text-white hover:bg-sky-700",
+    inactive: "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100",
+  },
+  log: {
+    active: "border-stone-700 bg-stone-700 text-white hover:bg-stone-600",
+    inactive: "border-stone-300 bg-stone-50 text-stone-800 hover:bg-stone-100",
+  },
+} satisfies Record<LogLevelFilter, { active: string; inactive: string }>;
 
 function levelIcon(level: LogEntry["level"]) {
   if (level === "error" || level === "warn") {
@@ -174,10 +208,16 @@ export default function Logs() {
             <div className="flex flex-wrap gap-1">
               {levels.map((candidate) => (
                 <Button
+                  className={cn(
+                    "font-semibold",
+                    level === candidate
+                      ? filterStyles[candidate].active
+                      : filterStyles[candidate].inactive,
+                  )}
                   key={candidate}
                   onClick={() => setLevel(candidate)}
                   size="sm"
-                  variant={level === candidate ? "default" : "outline"}
+                  variant="outline"
                 >
                   {candidate === "all" ? <ListFilterIcon data-icon="inline-start" /> : null}
                   {candidate}
@@ -206,24 +246,45 @@ export default function Logs() {
               </div>
             </div>
           ) : (
-            <div className="grid max-h-[42rem] gap-2 overflow-y-auto rounded-xl border border-stone-800 bg-stone-950 p-2 text-stone-100 shadow-inner">
-              {filteredEntries.map((entry) => (
-                <article
-                  className="grid gap-2 rounded-lg border border-stone-800 bg-stone-900 p-3 text-sm md:grid-cols-[5rem_6rem_minmax(0,1fr)]"
-                  key={entry.id}
-                >
-                  <time className="font-mono text-xs text-stone-400">
-                    {formatLogTime(entry.timestamp)}
-                  </time>
-                  <Badge className="w-fit" variant={levelBadgeVariant(entry.level)}>
-                    {levelIcon(entry.level)}
-                    {entry.level}
-                  </Badge>
-                  <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-xs leading-5 text-stone-100">
-                    {entry.message}
-                  </pre>
-                </article>
-              ))}
+            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+              <div className="grid gap-1 border-b border-stone-200 bg-stone-50 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div className="text-sm font-medium text-stone-950">Log stream</div>
+                <div className="text-xs text-stone-500">
+                  Showing {filteredEntries.length} of {entries.length} entries
+                </div>
+              </div>
+              <div className="max-h-[42rem] overflow-y-auto">
+                {filteredEntries.map((entry) => {
+                  const style = levelStyles[entry.level];
+
+                  return (
+                    <article
+                      className={cn(
+                        "grid gap-3 border-b border-l-4 border-b-stone-100 px-4 py-3 text-sm transition last:border-b-0 md:grid-cols-[6rem_7rem_minmax(0,1fr)]",
+                        style.marker,
+                        style.row,
+                      )}
+                      key={entry.id}
+                    >
+                      <time className="font-mono text-xs leading-6 text-stone-500">
+                        {formatLogTime(entry.timestamp)}
+                      </time>
+                      <span
+                        className={cn(
+                          "inline-flex h-6 w-fit items-center gap-1.5 rounded-full px-2 text-xs font-semibold ring-1",
+                          style.badge,
+                        )}
+                      >
+                        {levelIcon(entry.level)}
+                        {entry.level}
+                      </span>
+                      <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-[0.8125rem] leading-5 text-stone-900">
+                        {entry.message}
+                      </pre>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           )}
         </CardContent>

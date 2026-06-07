@@ -6,13 +6,15 @@ const backendOrigin = process.env.CONVERTX_API_ORIGIN ?? "http://localhost:3000"
 
 const backendPaths = ["/api", "/download", "/archive", "/health", "/outpost.goauthentik.io"];
 
-export default defineConfig({
+const productionAliases = {
+  "react-dom/server": "react-dom/server.node",
+  "react-dom/static": "react-dom/static.node",
+};
+
+export default defineConfig(({ command }) => ({
   plugins: [tailwindcss(), reactRouter()],
   resolve: {
-    alias: {
-      "react-dom/server": "react-dom/server.node",
-      "react-dom/static": "react-dom/static.node",
-    },
+    ...(command === "build" ? { alias: productionAliases } : {}),
     tsconfigPaths: true,
   },
   server: {
@@ -28,4 +30,4 @@ export default defineConfig({
       ]),
     ),
   },
-});
+}));
