@@ -383,7 +383,7 @@ export default function Workbench() {
         <PageHeader
           eyebrow="Workbench"
           title="Conversion workbench"
-          description="Upload and convert files from the new React frontend."
+          description="Upload and convert files through your authenticated ConvertX workspace."
         />
         <AuthRequiredState />
       </>

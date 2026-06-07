@@ -128,7 +128,9 @@ export default function Results({ params }: Route.ComponentProps) {
           <Card className="border-stone-200 bg-white/90 shadow-sm">
             <CardHeader>
               <CardTitle>Converted files</CardTitle>
-              <CardDescription>Download finished files as each converter reports completion.</CardDescription>
+              <CardDescription>
+                Download finished files as each converter reports completion.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {job.files.length === 0 ? (
@@ -165,8 +167,17 @@ export default function Results({ params }: Route.ComponentProps) {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button asChild disabled={file.state !== "done"} size="icon-sm" variant="ghost">
-                            <a aria-label={`Download ${file.outputName}`} download={file.outputName} href={file.downloadUrl}>
+                          <Button
+                            asChild
+                            disabled={file.state !== "done"}
+                            size="icon-sm"
+                            variant="ghost"
+                          >
+                            <a
+                              aria-label={`Download ${file.outputName}`}
+                              download={file.outputName}
+                              href={file.downloadUrl}
+                            >
                               <DownloadIcon />
                             </a>
                           </Button>

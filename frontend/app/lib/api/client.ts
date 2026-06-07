@@ -2,11 +2,10 @@ import type { z } from "zod";
 import {
   apiErrorSchema,
   conversionFormatsResponseSchema,
+  deleteJobResponseSchema,
   deleteUploadResponseSchema,
   historyResponseSchema,
   jobResponseSchema,
-  loginResponseSchema,
-  logoffResponseSchema,
   logsResponseSchema,
   sessionResponseSchema,
   startConversionResponseSchema,
@@ -15,10 +14,9 @@ import {
   type ConversionFormats,
   type HistoryJob,
   type ConversionJob,
-  type LoginResult,
   type LogEntry,
   type Session,
-  type UploadResult
+  type UploadResult,
 } from "./schemas";
 
 type ApiSuccessSchema<TData> = z.ZodType<{ success: true; data: TData }>;
@@ -57,13 +55,13 @@ export class ContractError extends Error {
 const parseJson = async (response: Response) => {
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
-    if (response.redirected || response.url.includes("/login")) {
+    if (response.redirected || response.url.includes("/outpost.goauthentik.io")) {
       throw new AuthRequiredError();
     }
 
     throw new ContractError("Expected a JSON response from the ConvertX API.", {
       status: response.status,
-      url: response.url
+      url: response.url,
     });
   }
 
@@ -73,7 +71,7 @@ const parseJson = async (response: Response) => {
 const parseApiResult = <TData>(
   json: unknown,
   schema: ApiSuccessSchema<TData>,
-  status: number
+  status: number,
 ): TData => {
   const errorResult = apiErrorSchema.safeParse(json);
   if (errorResult.success) {
@@ -88,7 +86,7 @@ const parseApiResult = <TData>(
   if (!result.success) {
     throw new ContractError("The ConvertX API response did not match the frontend contract.", {
       issues: result.error.issues,
-      json
+      json,
     });
   }
 
@@ -98,15 +96,15 @@ const parseApiResult = <TData>(
 async function apiRequest<TData>(
   path: string,
   schema: ApiSuccessSchema<TData>,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<TData> {
   const response = await fetch(path, {
     ...init,
     credentials: "include",
     headers: {
       ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...init?.headers
-    }
+      ...init?.headers,
+    },
   });
 
   const json = await parseJson(response);
@@ -121,7 +119,7 @@ const parseXhrJson = <TData>(xhr: XMLHttpRequest, schema: ApiSuccessSchema<TData
     throw new ContractError("Upload response was not valid JSON.", {
       status: xhr.status,
       response: xhr.responseText,
-      error
+      error,
     });
   }
 
@@ -132,26 +130,13 @@ export function fetchSession(): Promise<Session> {
   return apiRequest("/api/session", sessionResponseSchema);
 }
 
-export function login(credentials: { email: string; password: string }): Promise<LoginResult> {
-  return apiRequest("/api/login", loginResponseSchema, {
-    method: "POST",
-    body: JSON.stringify(credentials)
-  });
-}
-
-export function logoff() {
-  return apiRequest("/api/logoff", logoffResponseSchema, {
-    method: "POST"
-  });
-}
-
 export function fetchConversionFormats(): Promise<ConversionFormats> {
   return apiRequest("/api/conversion-formats", conversionFormatsResponseSchema);
 }
 
 export async function createJob(): Promise<ConversionJob> {
   const result = await apiRequest("/api/jobs", jobResponseSchema, {
-    method: "POST"
+    method: "POST",
   });
 
   return result.job;
@@ -167,6 +152,18 @@ export async function fetchHistory(): Promise<HistoryJob[]> {
   return result.jobs;
 }
 
+export async function deleteJob(jobId: string): Promise<string> {
+  const result = await apiRequest(
+    `/api/jobs/${encodeURIComponent(jobId)}`,
+    deleteJobResponseSchema,
+    {
+      method: "DELETE",
+    },
+  );
+
+  return result.jobId;
+}
+
 export async function fetchLogs(): Promise<LogEntry[]> {
   const result = await apiRequest("/api/logs", logsResponseSchema);
   return result.entries;
@@ -175,71 +172,77 @@ export async function fetchLogs(): Promise<LogEntry[]> {
 export function uploadJobFile({
   jobId,
   file,
-  onProgress
+  onProgress,
 }: {
   jobId: string;
   file: File;
   onProgress?: (progress: number) => void;
 }) {
-  return new Promise<UploadResult>(
-    (resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      formData.append("file", file, file.name);
+  return new Promise<UploadResult>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append("file", file, file.name);
 
-      xhr.open("POST", `/api/jobs/${encodeURIComponent(jobId)}/upload`, true);
-      xhr.withCredentials = true;
+    xhr.open("POST", `/api/jobs/${encodeURIComponent(jobId)}/upload`, true);
+    xhr.withCredentials = true;
 
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) {
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        return;
+      }
+
+      onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+
+    xhr.onload = () => {
+      try {
+        if (xhr.status === 401) {
+          reject(new AuthRequiredError());
           return;
         }
 
-        onProgress?.(Math.round((event.loaded / event.total) * 100));
-      };
+        resolve(parseXhrJson(xhr, uploadResponseSchema));
+      } catch (error) {
+        reject(error);
+      }
+    };
 
-      xhr.onload = () => {
-        try {
-          if (xhr.status === 401) {
-            reject(new AuthRequiredError());
-            return;
-          }
+    xhr.onerror = () => {
+      reject(new ApiError({ code: "UPLOAD_NETWORK_ERROR", message: "Upload failed." }, xhr.status));
+    };
 
-          resolve(parseXhrJson(xhr, uploadResponseSchema));
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      xhr.onerror = () => {
-        reject(new ApiError({ code: "UPLOAD_NETWORK_ERROR", message: "Upload failed." }, xhr.status));
-      };
-
-      xhr.send(formData);
-    }
-  );
+    xhr.send(formData);
+  });
 }
 
 export function deleteUploadedFile(jobId: string, fileName: string) {
-  return apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/uploads/delete`, deleteUploadResponseSchema, {
-    method: "POST",
-    body: JSON.stringify({ fileName })
-  });
+  return apiRequest(
+    `/api/jobs/${encodeURIComponent(jobId)}/uploads/delete`,
+    deleteUploadResponseSchema,
+    {
+      method: "POST",
+      body: JSON.stringify({ fileName }),
+    },
+  );
 }
 
 export function startConversion({
   jobId,
   fileNames,
   target,
-  converter
+  converter,
 }: {
   jobId: string;
   fileNames: string[];
   target: string;
   converter: string;
 }) {
-  return apiRequest(`/api/jobs/${encodeURIComponent(jobId)}/convert`, startConversionResponseSchema, {
-    method: "POST",
-    body: JSON.stringify({ fileNames, target, converter })
-  });
+  return apiRequest(
+    `/api/jobs/${encodeURIComponent(jobId)}/convert`,
+    startConversionResponseSchema,
+    {
+      method: "POST",
+      body: JSON.stringify({ fileNames, target, converter }),
+    },
+  );
 }

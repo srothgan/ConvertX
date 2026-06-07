@@ -1,31 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createJob,
+  deleteJob,
   deleteUploadedFile,
   fetchConversionFormats,
   fetchHistory,
   fetchJob,
   fetchLogs,
   fetchSession,
-  login,
-  logoff,
   startConversion,
-  uploadJobFile
+  uploadJobFile,
 } from "./client";
+import { ApiError } from "./client";
 
 export const queryKeys = {
   session: ["session"] as const,
   formats: ["conversion-formats"] as const,
   job: (jobId: string) => ["job", jobId] as const,
   history: ["history"] as const,
-  logs: ["logs"] as const
+  logs: ["logs"] as const,
 };
 
 export function useSessionQuery() {
   return useQuery({
     queryKey: queryKeys.session,
     queryFn: fetchSession,
-    retry: false
+    retry: false,
   });
 }
 
@@ -34,7 +34,7 @@ export function useConversionFormatsQuery() {
     queryKey: queryKeys.formats,
     queryFn: fetchConversionFormats,
     staleTime: 1000 * 60 * 30,
-    retry: false
+    retry: false,
   });
 }
 
@@ -50,7 +50,7 @@ export function useJobQuery(jobId: string) {
 
       return 1500;
     },
-    retry: false
+    retry: false,
   });
 }
 
@@ -61,29 +61,7 @@ export function useCreateJobMutation() {
     mutationFn: createJob,
     onSuccess: (job) => {
       queryClient.setQueryData(queryKeys.job(job.id), job);
-    }
-  });
-}
-
-export function useLoginMutation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: login,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.session });
-    }
-  });
-}
-
-export function useLogoffMutation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: logoff,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.session });
-    }
+    },
   });
 }
 
@@ -91,7 +69,18 @@ export function useHistoryQuery() {
   return useQuery({
     queryKey: queryKeys.history,
     queryFn: fetchHistory,
-    retry: false
+    retry: false,
+  });
+}
+
+export function useDeleteJobMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteJob,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.history });
+    },
   });
 }
 
@@ -99,26 +88,27 @@ export function useLogsQuery() {
   return useQuery({
     queryKey: queryKeys.logs,
     queryFn: fetchLogs,
-    refetchInterval: 3000,
-    retry: false
+    refetchInterval: (query) =>
+      query.state.error instanceof ApiError && query.state.error.status === 403 ? false : 3000,
+    retry: false,
   });
 }
 
 export function useUploadFileMutation() {
   return useMutation({
-    mutationFn: uploadJobFile
+    mutationFn: uploadJobFile,
   });
 }
 
 export function useDeleteUploadedFileMutation() {
   return useMutation({
     mutationFn: ({ jobId, fileName }: { jobId: string; fileName: string }) =>
-      deleteUploadedFile(jobId, fileName)
+      deleteUploadedFile(jobId, fileName),
   });
 }
 
 export function useStartConversionMutation() {
   return useMutation({
-    mutationFn: startConversion
+    mutationFn: startConversion,
   });
 }

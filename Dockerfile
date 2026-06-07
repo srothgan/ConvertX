@@ -1,6 +1,7 @@
 FROM debian:testing-slim AS base
 LABEL org.opencontainers.image.source="https://github.com/C4illin/ConvertX"
 WORKDIR /app
+ARG BUN_VERSION=1.3.11
 
 # install bun
 RUN apt-get update && apt-get install -y \
@@ -12,9 +13,9 @@ RUN apt-get update && apt-get install -y \
 # if architecture is arm64, use the arm64 version of bun
 RUN ARCH=$(uname -m) && \
   if [ "$ARCH" = "aarch64" ]; then \
-    curl -fsSL -o bun-linux-aarch64.zip https://github.com/oven-sh/bun/releases/download/bun-v1.2.2/bun-linux-aarch64.zip; \
+    curl -fsSL -o bun-linux-aarch64.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-aarch64.zip"; \
   else \
-    curl -fsSL -o bun-linux-x64-baseline.zip https://github.com/oven-sh/bun/releases/download/bun-v1.2.2/bun-linux-x64-baseline.zip; \
+    curl -fsSL -o bun-linux-x64-baseline.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64-baseline.zip"; \
   fi
 
 RUN unzip -j bun-linux-*.zip -d /usr/local/bin && \
@@ -28,6 +29,10 @@ RUN mkdir -p /temp/dev
 COPY package.json bun.lock /temp/dev/
 RUN cd /temp/dev && bun install --frozen-lockfile
 
+RUN mkdir -p /temp/frontend
+COPY frontend/package.json frontend/bun.lock /temp/frontend/
+RUN cd /temp/frontend && bun install --frozen-lockfile
+
 # install with --production (exclude devDependencies)
 RUN mkdir -p /temp/prod
 COPY package.json bun.lock /temp/prod/
@@ -37,6 +42,7 @@ FROM base AS prerelease
 WORKDIR /app
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
+COPY --from=install /temp/frontend/node_modules frontend/node_modules
 
 # ENV NODE_ENV=production
 RUN bun run build
@@ -101,6 +107,7 @@ RUN ARCH=$(uname -m) && \
 
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /app/public/ /app/public/
+COPY --from=prerelease /app/frontend/build/client /app/frontend/build/client
 COPY --from=prerelease /app/dist /app/dist
 
 # COPY . .
@@ -110,4 +117,4 @@ EXPOSE 3000/tcp
 # used for calibre
 ENV QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox"
 ENV NODE_ENV=production
-ENTRYPOINT [ "bun", "run", "dist/src/index.js" ]
+ENTRYPOINT [ "bun", "run", "dist/backend/index.js" ]

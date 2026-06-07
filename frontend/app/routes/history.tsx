@@ -6,6 +6,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { ApiErrorNotice } from "~/components/api-error-notice";
 import { AuthRequiredState } from "~/components/auth-required-state";
 import { PageHeader } from "~/components/page-header";
@@ -23,7 +24,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { AuthRequiredError } from "~/lib/api/client";
-import { useHistoryQuery } from "~/lib/api/queries";
+import { useDeleteJobMutation, useHistoryQuery } from "~/lib/api/queries";
 import type { HistoryJob } from "~/lib/api/schemas";
 
 function statusVariant(job: HistoryJob) {
@@ -47,9 +48,25 @@ function formatDate(value: string) {
 
 export default function History() {
   const historyQuery = useHistoryQuery();
+  const deleteJobMutation = useDeleteJobMutation();
   const jobs = historyQuery.data ?? [];
   const completed = jobs.filter((job) => job.status === "completed").length;
   const failed = jobs.filter((job) => job.status === "failed").length;
+
+  const handleDeleteJob = async (jobId: string) => {
+    const confirmed = window.confirm(`Delete job ${jobId}? This cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteJobMutation.mutateAsync(jobId);
+      toast.success(`Deleted job ${jobId}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not delete the job.";
+      toast.error(message);
+    }
+  };
 
   if (historyQuery.error instanceof AuthRequiredError) {
     return (
@@ -72,7 +89,9 @@ export default function History() {
         description="Scan previous jobs, inspect their progress, and jump back to result downloads."
       />
 
-      {historyQuery.error ? <ApiErrorNotice error={historyQuery.error} title="Could not load history" /> : null}
+      {historyQuery.error ? (
+        <ApiErrorNotice error={historyQuery.error} title="Could not load history" />
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <Card className="bg-card/95 shadow-sm">
@@ -120,7 +139,7 @@ export default function History() {
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight">No conversion history yet</h2>
                 <p className="max-w-md text-sm text-muted-foreground">
-                  Jobs will appear here after a conversion starts from the React workbench.
+                  Jobs will appear here after a conversion starts from the workbench.
                 </p>
               </div>
             </div>
@@ -168,15 +187,27 @@ export default function History() {
                             <ExternalLinkIcon />
                           </Link>
                         </Button>
-                        <Button asChild disabled={job.files.length === 0} size="icon-sm" variant="ghost">
-                          <a aria-label={`Download archive for job ${job.id}`} href={job.archiveUrl}>
+                        <Button
+                          asChild
+                          disabled={job.files.length === 0}
+                          size="icon-sm"
+                          variant="ghost"
+                        >
+                          <a
+                            aria-label={`Download archive for job ${job.id}`}
+                            href={job.archiveUrl}
+                          >
                             <ArchiveIcon />
                           </a>
                         </Button>
-                        <Button asChild size="icon-sm" variant="ghost">
-                          <a aria-label={`Delete job ${job.id}`} href={job.deleteUrl}>
-                            <Trash2Icon />
-                          </a>
+                        <Button
+                          aria-label={`Delete job ${job.id}`}
+                          disabled={deleteJobMutation.isPending}
+                          onClick={() => void handleDeleteJob(job.id)}
+                          size="icon-sm"
+                          variant="ghost"
+                        >
+                          <Trash2Icon />
                         </Button>
                       </div>
                     </TableCell>

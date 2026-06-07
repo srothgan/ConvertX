@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { convert } from "../../src/converters/calibre";
+import { convert } from "../../backend/converters/calibre";
 import { runCommonTests } from "./helpers/commonTests";
 
 runCommonTests(convert);

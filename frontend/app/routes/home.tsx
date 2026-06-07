@@ -25,6 +25,15 @@ function isAuthError(error: unknown) {
   return error instanceof AuthRequiredError;
 }
 
+function authentikStartUrl() {
+  const loginUrl = "/outpost.goauthentik.io/start";
+  if (typeof window === "undefined") {
+    return loginUrl;
+  }
+
+  return `${loginUrl}?rd=${encodeURIComponent(window.location.href)}`;
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -83,14 +92,14 @@ export default function Home() {
             <div>
               <h2 className="text-lg font-semibold text-stone-950">Sign in to run jobs</h2>
               <p className="text-sm text-stone-600">
-                The dashboard can show catalog data and conversion history after your session is
-                active.
+                The dashboard loads catalog data and conversion history after authentik approves
+                your session.
               </p>
             </div>
             <Button asChild>
-              <a href="/login">
+              <a href={authentikStartUrl()}>
                 <LogInIcon data-icon="inline-start" />
-                Open login
+                Start SSO
               </a>
             </Button>
           </CardContent>
@@ -103,7 +112,7 @@ export default function Home() {
             <div className="grid gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={isSignedIn ? "default" : "secondary"}>
-                  {isSignedIn ? "Ready" : "Login needed"}
+                  {isSignedIn ? "Ready" : "SSO needed"}
                 </Badge>
                 <Badge variant="outline">{activeJobs.length} active jobs</Badge>
               </div>

@@ -3,13 +3,13 @@ import { mkdir, rm } from "node:fs/promises";
 import { Elysia, t } from "elysia";
 import sanitize from "sanitize-filename";
 import { outputDir, uploadsDir } from "..";
+import { authService } from "../auth/authentik";
 import { getAllInputs, getAllTargets, getPossibleTargets, handleConvert } from "../converters/main";
 import db from "../db/db";
-import { Filename, Jobs, User } from "../db/types";
+import { Filename, Jobs } from "../db/types";
 import { getLogEntries } from "../helpers/logs";
-import { HIDE_HISTORY, HTTP_ALLOWED, WEBROOT } from "../helpers/env";
+import { HIDE_HISTORY, WEBROOT } from "../helpers/env";
 import { normalizeFiletype } from "../helpers/normalizeFiletype";
-import { FIRST_RUN, userService } from "./user";
 
 type ApiSet = {
   status?: number | string;
@@ -449,7 +449,7 @@ const buildFormatCatalog = () => {
   };
 };
 
-const serializeJob = (job: Jobs, userId: string | number) => {
+const serializeJob = (job: Jobs) => {
   const files = getJobFiles(String(job.id));
   const completedFiles = files.length;
   const expectedFiles = job.num_files ?? 0;
@@ -479,20 +479,15 @@ const serializeJob = (job: Jobs, userId: string | number) => {
           : file.status.toLowerCase().includes("done")
             ? "done"
             : "processing",
-      downloadUrl: `${WEBROOT}/download/${userId}/${job.id}/${encodeURIComponent(file.output_file_name)}`,
+      downloadUrl: `${WEBROOT}/download/${job.id}/${encodeURIComponent(file.output_file_name)}`,
     })),
   };
 };
 
-const serializeHistoryJob = (job: Jobs, userId: string | number) => {
-  const serializedJob = serializeJob(job, userId);
-
-  return {
-    ...serializedJob,
-    resultUrl: `/results/${job.id}`,
-    deleteUrl: `${WEBROOT}/delete/${job.id}`,
-  };
-};
+const serializeHistoryJob = (job: Jobs) => ({
+  ...serializeJob(job),
+  resultUrl: `/results/${job.id}`,
+});
 
 const toFileArray = (file: UploadFile | UploadFile[] | undefined) => {
   if (!file) {
@@ -503,80 +498,7 @@ const toFileArray = (file: UploadFile | UploadFile[] | undefined) => {
 };
 
 export const api = new Elysia({ prefix: "/api" })
-  .use(userService)
-  .post(
-    "/login",
-    async ({ body, set, jwt, cookie: { auth } }) => {
-      if (FIRST_RUN) {
-        return apiError(set, 409, "SETUP_REQUIRED", "ConvertX setup must be completed first.", {
-          redirectTo: "/setup",
-        });
-      }
-
-      const existingUser = db.query("SELECT * FROM users WHERE email = ?").as(User).get(body.email);
-
-      if (!existingUser) {
-        return apiError(set, 403, "INVALID_CREDENTIALS", "Invalid email or password.");
-      }
-
-      const validPassword = await Bun.password.verify(body.password, existingUser.password);
-
-      if (!validPassword) {
-        return apiError(set, 403, "INVALID_CREDENTIALS", "Invalid email or password.");
-      }
-
-      if (!auth) {
-        return apiError(set, 500, "COOKIE_UNAVAILABLE", "Cookies must be enabled to sign in.");
-      }
-
-      const accessToken = await jwt.sign({
-        id: String(existingUser.id),
-      });
-
-      auth.set({
-        value: accessToken,
-        httpOnly: true,
-        secure: !HTTP_ALLOWED,
-        maxAge: 60 * 60 * 24 * 7,
-        sameSite: "strict",
-      });
-
-      return {
-        success: true,
-        data: {
-          authenticated: true,
-          redirectTo: "/workbench",
-          user: {
-            id: String(existingUser.id),
-            email: existingUser.email,
-          },
-        },
-      };
-    },
-    {
-      cookie: "optionalSession",
-      body: t.Object({
-        email: t.String(),
-        password: t.String(),
-      }),
-    },
-  )
-  .post(
-    "/logoff",
-    ({ cookie: { auth } }) => {
-      if (auth?.value) {
-        auth.remove();
-      }
-
-      return {
-        success: true,
-        data: {
-          redirectTo: "/login",
-        },
-      };
-    },
-    { cookie: "optionalSession" },
-  )
+  .use(authService)
   .get(
     "/session",
     ({ user }) => {
@@ -586,9 +508,15 @@ export const api = new Elysia({ prefix: "/api" })
           authenticated: true,
           user: {
             id: String(user.id),
+            email: user.email,
+            username: user.username,
+            name: user.name,
+            groups: user.groups,
+            entitlements: user.entitlements,
+            isAdmin: user.isAdmin,
           },
-          loginUrl: `${WEBROOT}/login`,
-          logoffUrl: `${WEBROOT}/logoff`,
+          loginUrl: `${WEBROOT}/outpost.goauthentik.io/start`,
+          logoffUrl: `${WEBROOT}/outpost.goauthentik.io/sign_out`,
         },
       };
     },
@@ -616,7 +544,7 @@ export const api = new Elysia({ prefix: "/api" })
         .as(Jobs)
         .all(user.id)
         .filter((job) => job.num_files > 0)
-        .map((job) => serializeHistoryJob(job, user.id));
+        .map((job) => serializeHistoryJob(job));
 
       return {
         success: true,
@@ -637,11 +565,11 @@ export const api = new Elysia({ prefix: "/api" })
         },
       };
     },
-    { auth: true },
+    { admin: true },
   )
   .post(
     "/jobs",
-    async ({ set, user, cookie: { jobId } }) => {
+    async ({ set, user }) => {
       const dateCreated = new Date().toISOString();
       db.query("INSERT INTO jobs (user_id, date_created) VALUES (?, ?)").run(user.id, dateCreated);
 
@@ -654,24 +582,12 @@ export const api = new Elysia({ prefix: "/api" })
         return apiError(set, 500, "JOB_CREATE_FAILED", "Could not create a conversion job.");
       }
 
-      if (!jobId) {
-        return apiError(set, 500, "COOKIE_UNAVAILABLE", "Cookies must be enabled to upload files.");
-      }
-
-      jobId.set({
-        value: String(inserted.id),
-        httpOnly: true,
-        secure: !HTTP_ALLOWED,
-        maxAge: 24 * 60 * 60,
-        sameSite: "strict",
-      });
-
       await mkdir(`${uploadsDir}${user.id}/${inserted.id}/`, { recursive: true });
 
       return {
         success: true,
         data: {
-          job: serializeJob(inserted, user.id),
+          job: serializeJob(inserted),
         },
       };
     },
@@ -688,7 +604,35 @@ export const api = new Elysia({ prefix: "/api" })
       return {
         success: true,
         data: {
-          job: serializeJob(job, user.id),
+          job: serializeJob(job),
+        },
+      };
+    },
+    { auth: true, params: t.Object({ jobId: t.String() }) },
+  )
+  .delete(
+    "/jobs/:jobId",
+    async ({ set, params, user }) => {
+      const job = getJobForUser(params.jobId, user.id);
+      if (!job) {
+        return apiError(set, 404, "JOB_NOT_FOUND", "Job not found.");
+      }
+
+      await rm(`${outputDir}${job.user_id}/${job.id}`, {
+        recursive: true,
+        force: true,
+      });
+      await rm(`${uploadsDir}${job.user_id}/${job.id}`, {
+        recursive: true,
+        force: true,
+      });
+
+      db.query("DELETE FROM jobs WHERE id = ?").run(job.id);
+
+      return {
+        success: true,
+        data: {
+          jobId: String(job.id),
         },
       };
     },

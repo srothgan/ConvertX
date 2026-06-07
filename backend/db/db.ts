@@ -7,9 +7,15 @@ const db = new Database("./data/mydb.sqlite", { create: true });
 if (!db.query("SELECT * FROM sqlite_master WHERE type='table'").get()) {
   db.exec(`
 CREATE TABLE IF NOT EXISTS users (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	email TEXT NOT NULL,
-	password TEXT NOT NULL
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  authentik_uid TEXT NOT NULL UNIQUE,
+  email TEXT,
+  username TEXT,
+  name TEXT,
+  groups_json TEXT NOT NULL DEFAULT '[]',
+  entitlements_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS file_names (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,14 +33,14 @@ CREATE TABLE IF NOT EXISTS jobs (
   num_files INTEGER DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
-PRAGMA user_version = 1;`);
+PRAGMA user_version = 2;`);
 }
 
 const dbVersion = (db.query("PRAGMA user_version").get() as { user_version?: number }).user_version;
-if (dbVersion === 0) {
-  db.exec("ALTER TABLE file_names ADD COLUMN status TEXT DEFAULT 'not started';");
-  db.exec("PRAGMA user_version = 1;");
-  console.log("Updated database to version 1.");
+if (dbVersion !== 2) {
+  throw new Error(
+    "ConvertX authentik auth requires a fresh schema (user_version=2). Back up data/mydb.sqlite, then start with a fresh database as described in plan.md.",
+  );
 }
 
 // enable WAL mode

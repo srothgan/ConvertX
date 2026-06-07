@@ -1,4 +1,10 @@
-import { AlertTriangleIcon, InfoIcon, ListFilterIcon, RefreshCwIcon, TerminalIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  InfoIcon,
+  ListFilterIcon,
+  RefreshCwIcon,
+  TerminalIcon,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { ApiErrorNotice } from "~/components/api-error-notice";
 import { AuthRequiredState } from "~/components/auth-required-state";
@@ -8,7 +14,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Skeleton } from "~/components/ui/skeleton";
-import { AuthRequiredError } from "~/lib/api/client";
+import { ApiError, AuthRequiredError } from "~/lib/api/client";
 import { useLogsQuery } from "~/lib/api/queries";
 import type { LogEntry } from "~/lib/api/schemas";
 
@@ -72,8 +78,37 @@ export default function Logs() {
   if (logsQuery.error instanceof AuthRequiredError) {
     return (
       <>
-        <PageHeader eyebrow="Logs" title="Runtime logs" description="Sign in to inspect backend output." />
+        <PageHeader
+          eyebrow="Logs"
+          title="Runtime logs"
+          description="Sign in to inspect backend output."
+        />
         <AuthRequiredState />
+      </>
+    );
+  }
+
+  if (logsQuery.error instanceof ApiError && logsQuery.error.status === 403) {
+    return (
+      <>
+        <PageHeader
+          eyebrow="Logs"
+          title="Runtime logs"
+          description="Backend logs are available to authentik admins."
+        />
+        <Card className="border-amber-200 bg-amber-50/80 shadow-none">
+          <CardContent className="grid gap-3 p-6">
+            <div className="grid size-11 place-items-center rounded-lg bg-amber-100 text-amber-800">
+              <AlertTriangleIcon className="size-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-stone-950">Admin access required</h2>
+              <p className="text-sm text-stone-600">
+                Your authentik groups do not include an admin group for ConvertX.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </>
     );
   }
@@ -86,7 +121,9 @@ export default function Logs() {
         description="A live view of recent backend console output for the current ConvertX process."
       />
 
-      {logsQuery.error ? <ApiErrorNotice error={logsQuery.error} title="Could not load logs" /> : null}
+      {logsQuery.error ? (
+        <ApiErrorNotice error={logsQuery.error} title="Could not load logs" />
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <Card className="bg-card/95 shadow-sm">
@@ -116,8 +153,15 @@ export default function Logs() {
               <CardTitle>Process output</CardTitle>
               <CardDescription>Updates every few seconds while the page is open.</CardDescription>
             </div>
-            <Button disabled={logsQuery.isFetching} onClick={() => void logsQuery.refetch()} variant="outline">
-              <RefreshCwIcon className={logsQuery.isFetching ? "animate-spin" : ""} data-icon="inline-start" />
+            <Button
+              disabled={logsQuery.isFetching}
+              onClick={() => void logsQuery.refetch()}
+              variant="outline"
+            >
+              <RefreshCwIcon
+                className={logsQuery.isFetching ? "animate-spin" : ""}
+                data-icon="inline-start"
+              />
               Refresh
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { convert } from "../../src/converters/graphicsmagick";
+import { convert } from "../../backend/converters/graphicsmagick";
 import { runCommonTests } from "./helpers/commonTests";
 
 runCommonTests(convert);

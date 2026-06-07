@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { convert } from "../../src/converters/potrace";
+import { convert } from "../../backend/converters/potrace";
 import { runCommonTests } from "./helpers/commonTests";
 
 runCommonTests(convert);

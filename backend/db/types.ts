@@ -18,6 +18,12 @@ export class Jobs {
 
 export class User {
   id!: number;
-  email!: string;
-  password!: string;
+  authentik_uid!: string;
+  email!: string | null;
+  username!: string | null;
+  name!: string | null;
+  groups_json!: string;
+  entitlements_json!: string;
+  created_at!: string;
+  updated_at!: string;
 }

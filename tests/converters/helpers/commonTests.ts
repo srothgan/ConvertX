@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { ConvertFnWithExecFile } from "../../../src/converters/types";
+import { ConvertFnWithExecFile } from "../../../backend/converters/types";
 import {
   runConvertFailTest,
   runConvertLogsStderror,

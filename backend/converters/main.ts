@@ -262,7 +262,11 @@ function formatConverterFailure(error: unknown, converterName?: string) {
   const message = rawMessage.replace(/\s+/g, " ").trim();
   const executable = converterName === "libreoffice" ? "soffice" : converterName;
 
-  if (message.includes("ENOENT") || message.includes("not found") || message.includes("not recognized")) {
+  if (
+    message.includes("ENOENT") ||
+    message.includes("not found") ||
+    message.includes("not recognized")
+  ) {
     return `Failed: ${executable ?? "converter"} is not installed or not available on PATH.`;
   }
 

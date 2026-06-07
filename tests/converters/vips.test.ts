@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import type { ExecFileException } from "node:child_process";
-import { ExecFileFn } from "../../src/converters/types";
-import { convert } from "../../src/converters/vips";
+import { ExecFileFn } from "../../backend/converters/types";
+import { convert } from "../../backend/converters/vips";
 import { runCommonTests } from "./helpers/commonTests";
 
 let calls: string[][] = [];

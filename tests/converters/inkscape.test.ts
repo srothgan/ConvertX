@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { convert } from "../../src/converters/inkscape";
+import { convert } from "../../backend/converters/inkscape";
 import { runCommonTests } from "./helpers/commonTests";
 
 runCommonTests(convert);

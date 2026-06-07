@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { convert } from "../../src/converters/xelatex";
+import { convert } from "../../backend/converters/xelatex";
 import { runCommonTests } from "./helpers/commonTests";
 
 runCommonTests(convert);

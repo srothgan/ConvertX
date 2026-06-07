@@ -5,21 +5,27 @@ import {
   Meta,
   Outlet,
   Scripts,
-  ScrollRestoration
+  ScrollRestoration,
 } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell } from "./components/app-shell";
 import { AppProviders } from "./components/app-providers";
 import stylesheet from "./styles/app.css?url";
 
-export const links: Route.LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
+export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/favicon.ico", sizes: "any" },
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+  { rel: "manifest", href: "/site.webmanifest" },
+  { rel: "stylesheet", href: stylesheet },
+];
 
 export const meta: Route.MetaFunction = () => [
-  { title: "ConvertX React" },
+  { title: "ConvertX" },
   {
     name: "description",
-    content: "Parallel React frontend for ConvertX"
-  }
+    content: "Private file conversion for authenticated homeserver users",
+  },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -65,7 +71,7 @@ export default function App() {
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let title = "Application error";
-  let detail = "The React frontend could not render this route.";
+  let detail = "ConvertX could not render this route.";
 
   if (isRouteErrorResponse(error)) {
     title = `${error.status} ${error.statusText}`;
@@ -78,7 +84,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     <main className="grid min-h-svh place-items-center bg-background p-4 text-foreground">
       <div className="grid w-full max-w-lg gap-3 rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          ConvertX React
+          ConvertX
         </span>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="text-sm leading-6 text-muted-foreground">{detail}</p>

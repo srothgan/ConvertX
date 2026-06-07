@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { convert } from "../../src/converters/libreoffice";
-import type { ExecFileFn } from "../../src/converters/types";
+import { convert } from "../../backend/converters/libreoffice";
+import type { ExecFileFn } from "../../backend/converters/types";
 
 function requireDefined<T>(value: T, msg: string): NonNullable<T> {
   if (value === undefined || value === null) throw new Error(msg);
@@ -124,7 +124,7 @@ test("rejects when execFile returns an error", async () => {
   behavior = { kind: "error", message: "convert failed", stderr: "oops" };
   await expect(
     convert("in.txt", "txt", "docx", "out/out.docx", undefined, mockExecFile),
-  ).rejects.toMatch(/error: Error: convert failed/);
+  ).rejects.toThrow(/convert failed oops/);
 });
 
 // --- logging behavior --------------------------------------------------------
@@ -156,13 +156,10 @@ test("logs both stdout and stderr when both are present", async () => {
   expect(errors).toContain("stderr: beta");
 });
 
-test("logs stderr on exec error as well", async () => {
+test("includes stderr in exec error message", async () => {
   behavior = { kind: "error", message: "boom", stderr: "EPIPE" };
 
-  expect(convert("in.txt", "txt", "docx", "out/out.docx", undefined, mockExecFile)).rejects.toMatch(
-    /error: Error: boom/,
-  );
-
-  // The callback still provided stderr; your implementation logs it before settling
-  expect(errors).toContain("stderr: EPIPE");
+  await expect(
+    convert("in.txt", "txt", "docx", "out/out.docx", undefined, mockExecFile),
+  ).rejects.toThrow(/boom EPIPE/);
 });

@@ -1,7 +1,7 @@
 import fs from "fs";
 import { beforeEach, afterEach, expect, test, describe } from "bun:test";
-import { convert } from "../../src/converters/dasel";
-import type { ExecFileFn } from "../../src/converters/types";
+import { convert } from "../../backend/converters/dasel";
+import type { ExecFileFn } from "../../backend/converters/types";
 
 const originalWriteFile = fs.writeFile;
 

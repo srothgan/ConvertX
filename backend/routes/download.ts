@@ -3,22 +3,22 @@ import { Elysia } from "elysia";
 import sanitize from "sanitize-filename";
 import * as tar from "tar";
 import { outputDir } from "..";
+import { authService } from "../auth/authentik";
 import db from "../db/db";
-import { WEBROOT } from "../helpers/env";
-import { userService } from "./user";
 
 export const download = new Elysia()
-  .use(userService)
+  .use(authService)
   .get(
-    "/download/:userId/:jobId/:fileName",
-    async ({ params, redirect, user }) => {
+    "/download/:jobId/:fileName",
+    async ({ params, set, user }) => {
       const userId = user.id;
       const job = await db
         .query("SELECT * FROM jobs WHERE user_id = ? AND id = ?")
         .get(user.id, params.jobId);
 
       if (!job) {
-        return redirect(`${WEBROOT}/results`, 302);
+        set.status = 404;
+        return "File not found.";
       }
       // parse from URL encoded string
       const jobId = decodeURIComponent(params.jobId);
@@ -33,14 +33,15 @@ export const download = new Elysia()
   )
   .get(
     "/archive/:jobId",
-    async ({ params, redirect, user }) => {
+    async ({ params, set, user }) => {
       const userId = user.id;
       const job = await db
         .query("SELECT * FROM jobs WHERE user_id = ? AND id = ?")
         .get(user.id, params.jobId);
 
       if (!job) {
-        return redirect(`${WEBROOT}/results`, 302);
+        set.status = 404;
+        return "Archive not found.";
       }
 
       const jobId = decodeURIComponent(params.jobId);

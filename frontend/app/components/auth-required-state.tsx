@@ -2,6 +2,15 @@ import { LogInIcon, ShieldCheckIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 
+const authentikStartUrl = () => {
+  const loginUrl = "/outpost.goauthentik.io/start";
+  if (typeof window === "undefined") {
+    return loginUrl;
+  }
+
+  return `${loginUrl}?rd=${encodeURIComponent(window.location.href)}`;
+};
+
 export function AuthRequiredState() {
   return (
     <Card className="border-amber-200 bg-amber-50/80 shadow-none">
@@ -12,13 +21,13 @@ export function AuthRequiredState() {
         <div>
           <h2 className="text-lg font-semibold text-stone-950">Sign in required</h2>
           <p className="text-sm text-stone-600">
-            The React workbench keeps using the existing ConvertX cookie session.
+            ConvertX is protected by authentik. Start SSO to continue.
           </p>
         </div>
         <Button asChild>
-          <a href="/login">
+          <a href={authentikStartUrl()}>
             <LogInIcon data-icon="inline-start" />
-            Open login
+            Start SSO
           </a>
         </Button>
       </CardContent>

@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, describe } from "bun:test";
-import { convert } from "../../src/converters/vtracer";
-import type { ExecFileFn } from "../../src/converters/types";
+import { convert } from "../../backend/converters/vtracer";
+import type { ExecFileFn } from "../../backend/converters/types";
 
 describe("convert", () => {
   let mockExecFile: ExecFileFn;

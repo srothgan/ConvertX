@@ -2,5 +2,10 @@
 bun = "1.2.2"
 
 [env]
-JWT_SECRET = "aLongAndSecretStringUsedToSignTheJSONWebToken1234"
+AUTHENTIK_DEV_MODE = "true"
+AUTHENTIK_DEV_UID = "local-admin"
+AUTHENTIK_DEV_EMAIL = "demo@mail.de"
+AUTHENTIK_DEV_USERNAME = "demo"
+AUTHENTIK_DEV_NAME = "ConvertX Demo Admin"
+AUTHENTIK_DEV_GROUPS = "admins|users"
 FFMPEG_OUTPUT_ARGS = "-preset veryfast -threads 2"

@@ -2,26 +2,18 @@
 
 # ConvertX
 
-[![Docker](https://github.com/C4illin/ConvertX/actions/workflows/docker-publish.yml/badge.svg?branch=main)](https://github.com/C4illin/ConvertX/actions/workflows/docker-publish.yml)
-[![ghcr.io Pulls](https://img.shields.io/badge/dynamic/json?logo=github&url=https%3A%2F%2Fipitio.github.io%2Fbackage%2FC4illin%2FConvertX%2Fconvertx.json&query=%24.downloads&label=ghcr.io%20pulls&cacheSeconds=14400)](https://github.com/C4illin/ConvertX/pkgs/container/ConvertX)
-[![Docker Pulls](https://img.shields.io/docker/pulls/c4illin/convertx?style=flat&logo=docker&label=dockerhub%20pulls&link=https%3A%2F%2Fhub.docker.com%2Frepository%2Fdocker%2Fc4illin%2Fconvertx%2Fgeneral)](https://hub.docker.com/r/c4illin/convertx)
-[![GitHub Release](https://img.shields.io/github/v/release/C4illin/ConvertX)](https://github.com/C4illin/ConvertX/pkgs/container/convertx)
-![GitHub commits since latest release](https://img.shields.io/github/commits-since/C4illin/ConvertX/latest)
-![GitHub repo size](https://img.shields.io/github/repo-size/C4illin/ConvertX)
-![Docker container size](https://ghcr-badge.egpl.dev/c4illin/convertx/size?color=%230375b6&tag=latest&label=image+size&trim=)
-
-<a href="https://trendshift.io/repositories/13818" target="_blank"><img src="https://trendshift.io/api/badge/repositories/13818" alt="C4illin%2FConvertX | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-<!-- ![Dev image size](https://ghcr-badge.egpl.dev/c4illin/convertx/size?color=%230375b6&tag=main&label=dev+image&trim=) -->
-
 A self-hosted online file converter. Supports over a thousand different formats. Written with TypeScript, Bun and Elysia.
+
+## Fork status
+
+This repository is a personal ConvertX fork for a homeserver deployment. It keeps the conversion backend, replaces the old server-rendered/local-auth UI with a React TypeScript frontend, and expects authentik forward auth in production. Local ConvertX login, registration, setup, password, and JWT flows have been removed.
 
 ## Features
 
 - Convert files to different formats
 - Process multiple files at once
-- Password protection
-- Multiple accounts
+- Authentik forward-auth identity
+- Admin-only runtime logs
 
 ## Converters supported
 
@@ -54,71 +46,111 @@ Any missing converter? Open an issue or pull request!
 
 ## Deployment
 
-> [!WARNING]
-> If you can't login, make sure you are accessing the service over localhost or https otherwise set HTTP_ALLOWED=true
+This fork expects authentication to be owned by authentik and Nginx forward auth. ConvertX must not be reachable directly from the public internet; it trusts only `X-authentik-*` headers injected by the trusted reverse proxy.
+
+No public Docker Hub or GitHub Container Registry image is published for this fork. Build the image locally on the homeserver or in CI with `docker compose build`.
 
 ```yml
 # docker-compose.yml
 services:
   convertx:
-    image: ghcr.io/c4illin/convertx
+    build:
+      context: .
     container_name: convertx
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
-      - JWT_SECRET=aLongAndSecretStringUsedToSignTheJSONWebToken1234 # will use randomUUID() if unset
-      # - HTTP_ALLOWED=true # uncomment this if accessing it over a non-https connection
+      - TZ=Europe/Berlin
+      - AUTHENTIK_ADMIN_GROUPS=admins
+      - AUTHENTIK_USER_GROUPS=users,admins
+      - AUTO_DELETE_EVERY_N_HOURS=24
     volumes:
       - ./data:/app/data
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
 ```
 
-or
+If host Nginx is outside Docker, bind ConvertX to localhost only:
 
-```bash
-docker run -p 3000:3000 -v ./data:/app/data ghcr.io/c4illin/convertx
+```yml
+ports:
+  - "127.0.0.1:3000:3000"
 ```
 
-Then visit `http://localhost:3000` in your browser and create your account. Don't leave it unconfigured and open, as anyone can register the first account.
+For local Docker testing without authentik, use the checked-in `compose.yaml`. It enables `AUTHENTIK_DEV_MODE=true` with a demo admin identity. This mode fails startup when `NODE_ENV=production`.
 
-If you get unable to open database file run `chown -R $USER:$USER path` on the path you choose.
+This authentik schema intentionally does not migrate old local-password users. Back up `data/`, then start with a fresh SQLite database and fresh upload/output folders. If you get unable to open database file run `chown -R $USER:$USER path` on the path you choose.
+
+### Nginx forward auth
+
+Use authentik Proxy Provider forward-auth mode for the `https://convert.homeserver.de` application. Nginx must take the headers returned by the authentik outpost and overwrite any client-provided `X-authentik-*` headers before proxying to ConvertX.
+
+```nginx
+location / {
+    proxy_pass http://convertx;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+
+    auth_request /outpost.goauthentik.io/auth/nginx;
+    error_page 401 = @goauthentik_proxy_signin;
+
+    auth_request_set $authentik_username $upstream_http_x_authentik_username;
+    auth_request_set $authentik_groups $upstream_http_x_authentik_groups;
+    auth_request_set $authentik_entitlements $upstream_http_x_authentik_entitlements;
+    auth_request_set $authentik_email $upstream_http_x_authentik_email;
+    auth_request_set $authentik_name $upstream_http_x_authentik_name;
+    auth_request_set $authentik_uid $upstream_http_x_authentik_uid;
+
+    proxy_set_header X-authentik-username $authentik_username;
+    proxy_set_header X-authentik-groups $authentik_groups;
+    proxy_set_header X-authentik-entitlements $authentik_entitlements;
+    proxy_set_header X-authentik-email $authentik_email;
+    proxy_set_header X-authentik-name $authentik_name;
+    proxy_set_header X-authentik-uid $authentik_uid;
+}
+
+location /outpost.goauthentik.io {
+    proxy_pass http://authentik:9000/outpost.goauthentik.io;
+    proxy_set_header Host $host;
+    proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+}
+
+location @goauthentik_proxy_signin {
+    internal;
+    return 302 /outpost.goauthentik.io/start?rd=$scheme://$http_host$request_uri;
+}
+```
 
 ### Environment variables
 
-All are optional, JWT_SECRET is recommended to be set.
-
-| Name                         | Default                                            | Description                                                                                                                                                   |
-| ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| JWT_SECRET                   | when unset it will use the value from randomUUID() | A long and secret string used to sign the JSON Web Token                                                                                                      |
-| ACCOUNT_REGISTRATION         | false                                              | Allow users to register accounts                                                                                                                              |
-| HTTP_ALLOWED                 | false                                              | Allow HTTP connections, only set this to true locally                                                                                                         |
-| ALLOW_UNAUTHENTICATED        | false                                              | Allow unauthenticated users to use the service, only set this to true locally                                                                                 |
-| AUTO_DELETE_EVERY_N_HOURS    | 24                                                 | Checks every n hours for files older then n hours and deletes them, set to 0 to disable                                                                       |
-| WEBROOT                      |                                                    | The address to the root path setting this to "/convert" will serve the website on "example.com/convert/"                                                      |
-| FFMPEG_ARGS                  |                                                    | Arguments to pass to the input file of ffmpeg, e.g. `-hwaccel vaapi`. See https://github.com/C4illin/ConvertX/issues/190 for more info about hw-acceleration. |
-| FFMPEG_OUTPUT_ARGS           |                                                    | Arguments to pass to the output of ffmpeg, e.g. `-preset veryfast`                                                                                            |
-| HIDE_HISTORY                 | false                                              | Hide the history page                                                                                                                                         |
-| LANGUAGE                     | en                                                 | Language to format date strings in, specified as a [BCP 47 language tag](https://en.wikipedia.org/wiki/IETF_language_tag)                                     |
-| UNAUTHENTICATED_USER_SHARING | false                                              | Shares conversion history between all unauthenticated users                                                                                                   |
-| MAX_CONVERT_PROCESS          | 0                                                  | Maximum number of concurrent conversion processes allowed. Set to 0 for unlimited.                                                                            |
-
-### Docker images
-
-There is a `:latest` tag that is updated with every release and a `:main` tag that is updated with every push to the main branch. `:latest` is recommended for normal use.
-
-The image is available on [GitHub Container Registry](https://github.com/C4illin/ConvertX/pkgs/container/ConvertX) and [Docker Hub](https://hub.docker.com/r/c4illin/convertx).
-
-| Image                                  | What it is                       |
-| -------------------------------------- | -------------------------------- |
-| `image: ghcr.io/c4illin/convertx`      | The latest release on ghcr       |
-| `image: ghcr.io/c4illin/convertx:main` | The latest commit on ghcr        |
-| `image: c4illin/convertx`              | The latest release on docker hub |
-| `image: c4illin/convertx:main`         | The latest commit on docker hub  |
-
-![Release image size](https://ghcr-badge.egpl.dev/c4illin/convertx/size?color=%230375b6&tag=latest&label=release+image&trim=)
-![Dev image size](https://ghcr-badge.egpl.dev/c4illin/convertx/size?color=%230375b6&tag=main&label=dev+image&trim=)
-
-<!-- Dockerhub was introduced in 0.9.0 and older releases -->
+| Name                       | Default             | Description                                                                                                                                                   |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AUTHENTIK_ADMIN_GROUPS     | admins              | Comma-separated authentik groups that can view logs.                                                                                                          |
+| AUTHENTIK_USER_GROUPS      | users,admins        | Comma-separated authentik groups allowed to use ConvertX. Set to an empty string to allow any authenticated authentik user.                                   |
+| AUTHENTIK_DEV_MODE         | false               | Local-only demo identity mode. Refuses to run when `NODE_ENV=production`.                                                                                     |
+| AUTHENTIK_DEV_UID          | local-admin         | Demo identity stable UID.                                                                                                                                     |
+| AUTHENTIK_DEV_EMAIL        | demo@mail.de        | Demo identity email.                                                                                                                                          |
+| AUTHENTIK_DEV_USERNAME     | demo                | Demo identity username.                                                                                                                                       |
+| AUTHENTIK_DEV_NAME         | ConvertX Demo Admin | Demo identity display name.                                                                                                                                   |
+| AUTHENTIK_DEV_GROUPS       | admins\|users       | Demo identity authentik groups. Use `users` to test a non-admin user locally.                                                                                 |
+| AUTHENTIK_DEV_ENTITLEMENTS |                     | Demo identity authentik entitlements.                                                                                                                         |
+| AUTO_DELETE_EVERY_N_HOURS  | 24                  | Checks every n hours for files older then n hours and deletes them, set to 0 to disable.                                                                      |
+| WEBROOT                    |                     | The root path. Setting this to `/convert` serves the app on `example.com/convert/`.                                                                           |
+| FFMPEG_ARGS                |                     | Arguments to pass to the input file of ffmpeg, e.g. `-hwaccel vaapi`. See https://github.com/C4illin/ConvertX/issues/190 for more info about hw-acceleration. |
+| FFMPEG_OUTPUT_ARGS         |                     | Arguments to pass to the output of ffmpeg, e.g. `-preset veryfast`.                                                                                           |
+| HIDE_HISTORY               | false               | Hide the history page.                                                                                                                                        |
+| MAX_CONVERT_PROCESS        | 0                   | Maximum number of concurrent conversion processes allowed. Set to 0 for unlimited.                                                                            |
 
 ### Tutorial
 
@@ -133,7 +165,7 @@ Tutorial in polish: <https://www.kreatywnyprogramista.pl/convertx-lokalny-konwer
 
 ## Screenshots
 
-![ConvertX Preview](images/preview.png)
+![ConvertX React frontend](images/example.png)
 
 ## Development
 

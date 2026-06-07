@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, describe } from "bun:test";
-import { convert } from "../../src/converters/pandoc";
-import type { ExecFileFn } from "../../src/converters/types";
+import { convert } from "../../backend/converters/pandoc";
+import type { ExecFileFn } from "../../backend/converters/types";
 
 describe("convert", () => {
   let mockExecFile: ExecFileFn;
@@ -61,6 +61,6 @@ describe("convert", () => {
     mockExecFile = (cmd, args, callback) => callback(new Error("fail"), "", "");
     await expect(
       convert("input.md", "markdown", "html", "output.html", undefined, mockExecFile),
-    ).rejects.toMatch(/error: Error: fail/);
+    ).rejects.toThrow(/fail/);
   });
 });

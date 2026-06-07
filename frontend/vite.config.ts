@@ -4,25 +4,16 @@ import { defineConfig } from "vite";
 
 const backendOrigin = process.env.CONVERTX_API_ORIGIN ?? "http://localhost:3000";
 
-const backendPaths = [
-  "/account",
-  "/api",
-  "/choose-converter",
-  "/convert",
-  "/conversions",
-  "/delete",
-  "/download",
-  "/logoff",
-  "/progress",
-  "/register",
-  "/setup",
-  "/upload"
-];
+const backendPaths = ["/api", "/download", "/archive", "/health", "/outpost.goauthentik.io"];
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter()],
   resolve: {
-    tsconfigPaths: true
+    alias: {
+      "react-dom/server": "react-dom/server.node",
+      "react-dom/static": "react-dom/static.node",
+    },
+    tsconfigPaths: true,
   },
   server: {
     port: 5173,
@@ -32,9 +23,9 @@ export default defineConfig({
         path,
         {
           target: backendOrigin,
-          changeOrigin: true
-        }
-      ])
-    )
-  }
+          changeOrigin: true,
+        },
+      ]),
+    ),
+  },
 });

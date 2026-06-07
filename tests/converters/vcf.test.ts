@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { convert, parseVCF, toCSV } from "../../src/converters/vcf";
+import { convert, parseVCF, toCSV } from "../../backend/converters/vcf";
 
 describe("parseVCF", () => {
   test("should parse a simple VCF card", () => {

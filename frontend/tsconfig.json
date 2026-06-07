@@ -27,10 +27,5 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true
   },
-  "include": [
-    ".react-router/types/**/*",
-    "app/**/*",
-    "react-router.config.ts",
-    "vite.config.ts"
-  ]
+  "include": [".react-router/types/**/*", "app/**/*", "react-router.config.ts", "vite.config.ts"]
 }

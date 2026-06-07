@@ -1,6 +1,6 @@
-export type LogLevel = "log" | "info" | "warn" | "error";
+type LogLevel = "log" | "info" | "warn" | "error";
 
-export type LogEntry = {
+type LogEntry = {
   id: string;
   level: LogLevel;
   message: string;

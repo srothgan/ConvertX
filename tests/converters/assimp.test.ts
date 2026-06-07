@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { convert } from "../../src/converters/assimp";
+import { convert } from "../../backend/converters/assimp";
 import { runCommonTests } from "./helpers/commonTests";
 
 runCommonTests(convert);

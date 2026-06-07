@@ -14,7 +14,9 @@ export function PageHeader({ eyebrow, title, description }: PageHeaderProps) {
         <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           {title}
         </h1>
-        {description ? <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        ) : null}
       </div>
     </header>
   );
