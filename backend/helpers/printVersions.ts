@@ -85,7 +85,7 @@ if (process.env.NODE_ENV === "production") {
     }
   });
 
-  exec("dasel --version", (error, stdout) => {
+  exec("dasel version", (error, stdout) => {
     if (error) {
       console.error("dasel is not installed.");
     }
@@ -165,15 +165,18 @@ if (process.env.NODE_ENV === "production") {
     }
   });
 
-  exec("msgconvert --version", (error, stdout) => {
-    if (error) {
-      console.error("msgconvert (libemail-outlook-message-perl) is not installed");
-    }
+  exec(
+    `sh -lc 'command -v msgconvert >/dev/null && perl -MEmail::Address -MEmail::Outlook::Message -e 1'`,
+    (error) => {
+      if (error) {
+        console.error("msgconvert (libemail-outlook-message-perl) is not installed");
+      }
 
-    if (stdout) {
-      console.log(stdout.split("\n")[0]);
-    }
-  });
+      if (!error) {
+        console.log("msgconvert (libemail-outlook-message-perl) available");
+      }
+    },
+  );
 
   exec("bun -v", (error, stdout) => {
     if (error) {

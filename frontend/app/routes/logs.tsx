@@ -206,20 +206,20 @@ export default function Logs() {
               </div>
             </div>
           ) : (
-            <div className="grid max-h-[42rem] gap-2 overflow-y-auto rounded-xl border bg-sidebar p-2 text-sidebar-foreground">
+            <div className="grid max-h-[42rem] gap-2 overflow-y-auto rounded-xl border border-stone-800 bg-stone-950 p-2 text-stone-100 shadow-inner">
               {filteredEntries.map((entry) => (
                 <article
-                  className="grid gap-2 rounded-lg border border-sidebar-border bg-background/5 p-3 text-sm md:grid-cols-[5rem_6rem_minmax(0,1fr)]"
+                  className="grid gap-2 rounded-lg border border-stone-800 bg-stone-900 p-3 text-sm md:grid-cols-[5rem_6rem_minmax(0,1fr)]"
                   key={entry.id}
                 >
-                  <time className="font-mono text-xs text-sidebar-foreground/55">
+                  <time className="font-mono text-xs text-stone-400">
                     {formatLogTime(entry.timestamp)}
                   </time>
                   <Badge className="w-fit" variant={levelBadgeVariant(entry.level)}>
                     {levelIcon(entry.level)}
                     {entry.level}
                   </Badge>
-                  <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-xs leading-5 text-sidebar-foreground/85">
+                  <pre className="min-w-0 whitespace-pre-wrap break-words font-mono text-xs leading-5 text-stone-100">
                     {entry.message}
                   </pre>
                 </article>

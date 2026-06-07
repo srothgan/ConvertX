@@ -424,7 +424,7 @@ export default function Workbench() {
             </CardHeader>
             <CardContent className="grid gap-4">
               <div
-                className={`relative grid min-h-44 place-items-center rounded-xl border border-dashed p-6 text-center transition ${
+                className={`relative grid min-h-44 cursor-pointer place-items-center rounded-xl border border-dashed p-6 text-center transition ${
                   state.dragActive
                     ? "border-emerald-600 bg-emerald-50"
                     : "border-stone-300 bg-stone-50/80 hover:border-stone-500"
