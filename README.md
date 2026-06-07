@@ -86,30 +86,53 @@ For local Docker testing without authentik, use the checked-in `compose.yaml`. I
 
 This authentik schema intentionally does not migrate old local-password users. Back up `data/`, then start with a fresh SQLite database and fresh upload/output folders. If you get unable to open database file run `chown -R $USER:$USER path` on the path you choose.
 
-### Nginx forward auth
+### Nginx Proxy Manager forward auth
 
 Use authentik Proxy Provider forward-auth mode for the `https://convert.homeserver.de` application. Nginx must take the headers returned by the authentik outpost and overwrite any client-provided `X-authentik-*` headers before proxying to ConvertX.
 
+For Nginx Proxy Manager, add this to the proxy host's **Advanced** tab. The explicit `/api/`, `/download/`, and `/archive/` locations are required because NPM's generated `location /` includes its own `proxy_set_header` directives, so server-level authentik headers are not inherited by backend API requests.
+
 ```nginx
-location / {
-    proxy_pass http://convertx;
-    proxy_http_version 1.1;
+auth_request /outpost.goauthentik.io/auth/nginx;
+error_page 401 = @goauthentik_proxy_signin;
 
+auth_request_set $auth_cookie $upstream_http_set_cookie;
+add_header Set-Cookie $auth_cookie;
+
+auth_request_set $authentik_username $upstream_http_x_authentik_username;
+auth_request_set $authentik_groups $upstream_http_x_authentik_groups;
+auth_request_set $authentik_entitlements $upstream_http_x_authentik_entitlements;
+auth_request_set $authentik_email $upstream_http_x_authentik_email;
+auth_request_set $authentik_name $upstream_http_x_authentik_name;
+auth_request_set $authentik_uid $upstream_http_x_authentik_uid;
+
+proxy_set_header X-Forwarded-Proto https;
+proxy_set_header X-authentik-username $authentik_username;
+proxy_set_header X-authentik-groups $authentik_groups;
+proxy_set_header X-authentik-entitlements $authentik_entitlements;
+proxy_set_header X-authentik-email $authentik_email;
+proxy_set_header X-authentik-name $authentik_name;
+proxy_set_header X-authentik-uid $authentik_uid;
+
+location /outpost.goauthentik.io {
+    auth_request off;
+    proxy_pass http://authentik-server:9000/outpost.goauthentik.io;
     proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Original-URL https://$http_host$request_uri;
+    add_header Set-Cookie $auth_cookie;
+    auth_request_set $auth_cookie $upstream_http_set_cookie;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+}
 
-    auth_request /outpost.goauthentik.io/auth/nginx;
-    error_page 401 = @goauthentik_proxy_signin;
+location @goauthentik_proxy_signin {
+    internal;
+    add_header Set-Cookie $auth_cookie;
+    return 302 https://$http_host/outpost.goauthentik.io/start?rd=https://$http_host$request_uri;
+}
 
-    auth_request_set $authentik_username $upstream_http_x_authentik_username;
-    auth_request_set $authentik_groups $upstream_http_x_authentik_groups;
-    auth_request_set $authentik_entitlements $upstream_http_x_authentik_entitlements;
-    auth_request_set $authentik_email $upstream_http_x_authentik_email;
-    auth_request_set $authentik_name $upstream_http_x_authentik_name;
-    auth_request_set $authentik_uid $upstream_http_x_authentik_uid;
-
+location ^~ /api/ {
+    include conf.d/include/proxy.conf;
     proxy_set_header X-authentik-username $authentik_username;
     proxy_set_header X-authentik-groups $authentik_groups;
     proxy_set_header X-authentik-entitlements $authentik_entitlements;
@@ -118,17 +141,24 @@ location / {
     proxy_set_header X-authentik-uid $authentik_uid;
 }
 
-location /outpost.goauthentik.io {
-    proxy_pass http://authentik:9000/outpost.goauthentik.io;
-    proxy_set_header Host $host;
-    proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
-    proxy_pass_request_body off;
-    proxy_set_header Content-Length "";
+location ^~ /download/ {
+    include conf.d/include/proxy.conf;
+    proxy_set_header X-authentik-username $authentik_username;
+    proxy_set_header X-authentik-groups $authentik_groups;
+    proxy_set_header X-authentik-entitlements $authentik_entitlements;
+    proxy_set_header X-authentik-email $authentik_email;
+    proxy_set_header X-authentik-name $authentik_name;
+    proxy_set_header X-authentik-uid $authentik_uid;
 }
 
-location @goauthentik_proxy_signin {
-    internal;
-    return 302 /outpost.goauthentik.io/start?rd=$scheme://$http_host$request_uri;
+location ^~ /archive/ {
+    include conf.d/include/proxy.conf;
+    proxy_set_header X-authentik-username $authentik_username;
+    proxy_set_header X-authentik-groups $authentik_groups;
+    proxy_set_header X-authentik-entitlements $authentik_entitlements;
+    proxy_set_header X-authentik-email $authentik_email;
+    proxy_set_header X-authentik-name $authentik_name;
+    proxy_set_header X-authentik-uid $authentik_uid;
 }
 ```
 
