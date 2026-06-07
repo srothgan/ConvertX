@@ -4,6 +4,9 @@
   "scripts": {
     "dev": "bun run --watch src/index.tsx",
     "hot": "bun run --hot src/index.tsx",
+    "frontend:dev": "bun run --cwd frontend dev",
+    "frontend:build": "bun run --cwd frontend build",
+    "frontend:typecheck": "bun run --cwd frontend typecheck",
     "format": "npm-run-all 'format:*'",
     "format:eslint": "eslint --fix .",
     "format:prettier": "prettier --write .",

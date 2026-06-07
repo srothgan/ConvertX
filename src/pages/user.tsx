@@ -41,19 +41,25 @@ export const userService = new Elysia({ name: "user/service" })
     }),
   })
   .macro("auth", {
-    cookie: "session",
+    cookie: "optionalSession",
     async resolve({ status, jwt, cookie: { auth } }) {
       if (!auth.value) {
         return status(401, {
           success: false,
-          message: "Unauthorized",
+          error: {
+            code: "AUTH_REQUIRED",
+            message: "Sign in to continue.",
+          },
         });
       }
       const user = await jwt.verify(auth.value);
       if (!user) {
         return status(401, {
           success: false,
-          message: "Unauthorized",
+          error: {
+            code: "AUTH_REQUIRED",
+            message: "Sign in to continue.",
+          },
         });
       }
       return {

@@ -146,7 +146,8 @@ export function convert(
   return new Promise((resolve, reject) => {
     execFile("pandoc", args, (error, stdout, stderr) => {
       if (error) {
-        reject(`error: ${error}`);
+        reject(new Error([error.message, stderr, stdout].filter(Boolean).join(" ")));
+        return;
       }
 
       if (stdout) {

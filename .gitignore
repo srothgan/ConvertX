@@ -47,6 +47,10 @@ package-lock.json
 /db
 /data
 /dist
+/frontend/.react-router
+/frontend/build
+/frontend/node_modules
+/frontend/tsconfig.tsbuildinfo
 /Bruno
 /tsconfig.tsbuildinfo
 /public/generated.css

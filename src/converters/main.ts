@@ -1,4 +1,3 @@
-import { Cookie } from "elysia";
 import db from "../db/db";
 import { MAX_CONVERT_PROCESS } from "../helpers/env";
 import { normalizeFiletype, normalizeOutputFiletype } from "../helpers/normalizeFiletype";
@@ -154,7 +153,7 @@ export async function handleConvert(
   userOutputDir: string,
   convertTo: string,
   converterName: string,
-  jobId: Cookie<string | undefined>,
+  jobId: { value?: string | number | undefined },
 ) {
   const query = db.query(
     "INSERT INTO file_names (job_id, file_name, output_file_name, status) VALUES (?1, ?2, ?3, ?4)",
@@ -230,8 +229,9 @@ async function mainConverter(
   }
 
   if (!converterFunc) {
-    console.log(`No available converter supports converting from ${fileType} to ${convertTo}.`);
-    return "File type not supported";
+    const message = `No available converter supports converting from ${fileType} to ${convertTo}.`;
+    console.log(message);
+    return `Unsupported: ${message}`;
   }
 
   try {
@@ -252,8 +252,25 @@ async function mainConverter(
       `Failed to convert ${inputFilePath} from ${fileType} to ${convertTo} using ${converterName}.`,
       error,
     );
-    return "Failed, check logs";
+    return formatConverterFailure(error, converterName);
   }
+}
+
+function formatConverterFailure(error: unknown, converterName?: string) {
+  const rawMessage =
+    error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
+  const message = rawMessage.replace(/\s+/g, " ").trim();
+  const executable = converterName === "libreoffice" ? "soffice" : converterName;
+
+  if (message.includes("ENOENT") || message.includes("not found") || message.includes("not recognized")) {
+    return `Failed: ${executable ?? "converter"} is not installed or not available on PATH.`;
+  }
+
+  if (!message) {
+    return "Failed: converter exited without a usable error message.";
+  }
+
+  return `Failed: ${message.slice(0, 240)}${message.length > 240 ? "..." : ""}`;
 }
 
 const possibleTargets: Record<string, Record<string, string[]>> = {};
